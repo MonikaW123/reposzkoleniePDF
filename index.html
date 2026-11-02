@@ -1,1 +1,438 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard czasów realizacji</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/date-fns@2.30.0/index.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<style>
+  :root{
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel-2: #1c2128;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --s-color: #3fb950;
+    --m-color: #d29922;
+    --l-color: #f85149;
+    --removed-color: #484f58;
+    --p50: #58a6ff;
+    --p85: #bc8cff;
+    --p95: #f778ba;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 24px;
+  }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); margin-bottom: 20px; font-size: 0.9rem; }
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 20px;
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+  }
+  .panel h2 {
+    font-size: 1rem;
+    margin: 0 0 14px;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+  }
+  .chart-wrap { position: relative; height: 480px; }
+  .controls-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    cursor: pointer;
+    font-size: 0.85rem;
+    user-select: none;
+    transition: background .15s, opacity .15s;
+  }
+  .chip.active { background: #21262d; border-color: var(--accent); }
+  .chip .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .dot.S { background: var(--s-color); }
+  .dot.M { background: var(--m-color); }
+  .dot.L { background: var(--l-color); }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .stat-box {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .stat-box .label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em;}
+  .stat-box .value { font-size: 1.25rem; font-weight: 600; margin-top: 2px; }
+  .stat-box.p50 .value { color: var(--p50); }
+  .stat-box.p85 .value { color: var(--p85); }
+  .stat-box.p95 .value { color: var(--p95); }
+  form.add-form { display: flex; flex-direction: column; gap: 10px; }
+  label { font-size: 0.8rem; color: var(--muted); }
+  input, select {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    width: 100%;
+  }
+  button {
+    background: var(--accent);
+    color: #0d1117;
+    border: none;
+    font-weight: 600;
+    padding: 9px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  button:hover { opacity: .9; }
+  button.secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .legend-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .legend-swatch { width: 18px; height: 2px; display: inline-block; }
+  .hint { font-size: 0.78rem; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+  .removed-list { margin-top: 16px; }
+  .removed-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin-bottom: 6px;
+    font-size: 0.82rem;
+  }
+  .removed-item button { padding: 4px 10px; font-size: 0.78rem; }
+  footer { margin-top: 24px; color: var(--muted); font-size: 0.78rem; text-align: center; }
+</style>
+</head>
+<body>
 
+<h1>📊 Dashboard czasów realizacji (Lead Time)</h1>
+<div class="subtitle">Scatterplot na podstawie pliku <code>Lead Times - 2024-25.xlsx</code> — filtruj rozmiary, kliknij punkt aby usunąć/przywrócić odstające wartości, dodawaj nowe obserwacje.</div>
+
+<div class="layout">
+  <div class="panel">
+    <h2>Rozkład czasów realizacji</h2>
+    <div class="controls-row" id="filterChips"></div>
+    <div class="stats">
+      <div class="stat-box p50"><div class="label">Percentyl 50</div><div class="value" id="p50val">–</div></div>
+      <div class="stat-box p85"><div class="label">Percentyl 85</div><div class="value" id="p85val">–</div></div>
+      <div class="stat-box p95"><div class="label">Percentyl 95</div><div class="value" id="p95val">–</div></div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="scatterChart"></canvas>
+    </div>
+    <div class="hint">💡 Kliknij na punkt danych, aby oznaczyć go jako odstający (usunięty z obliczeń) — kliknij ponownie na liście „Usunięte punkty”, aby przywrócić.</div>
+  </div>
+
+  <div>
+    <div class="panel" style="margin-bottom:20px;">
+      <h2>Dodaj nowy punkt danych</h2>
+      <form class="add-form" id="addForm">
+        <div>
+          <label for="sizeInput">Rozmiar</label>
+          <select id="sizeInput">
+            <option value="S">S</option>
+            <option value="M">M</option>
+            <option value="L">L</option>
+          </select>
+        </div>
+        <div>
+          <label for="leadTimeInput">Czas realizacji (dni)</label>
+          <input type="number" id="leadTimeInput" min="0" step="1" required placeholder="np. 60">
+        </div>
+        <div>
+          <label for="dateInput">Data ukończenia</label>
+          <input type="date" id="dateInput" required>
+        </div>
+        <button type="submit">➕ Dodaj punkt</button>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h2>Legenda i usunięte punkty</h2>
+      <div class="legend-line"><span class="legend-swatch" style="background:var(--p50);"></span> Percentyl 50</div>
+      <div class="legend-line"><span class="legend-swatch" style="background:var(--p85);"></span> Percentyl 85</div>
+      <div class="legend-line"><span class="legend-swatch" style="background:var(--p95);"></span> Percentyl 95</div>
+      <div class="removed-list" id="removedList">
+        <div class="hint">Brak usuniętych punktów.</div>
+      </div>
+      <button class="secondary" id="resetBtn" style="margin-top:12px; width:100%;">↺ Przywróć dane domyślne</button>
+    </div>
+  </div>
+</div>
+
+<footer>Dashboard generowany statycznie — dane przechowywane lokalnie w przeglądarce (localStorage).</footer>
+
+<script>
+const DEFAULT_DATA = [{"date": "2024-07-15", "size": "S", "leadTime": 49.0}, {"date": "2024-08-22", "size": "S", "leadTime": 48.0}, {"date": "2024-09-10", "size": "S", "leadTime": 87.0}, {"date": "2024-09-25", "size": "M", "leadTime": 57.0}, {"date": "2024-10-05", "size": "M", "leadTime": 148.0}, {"date": "2024-10-14", "size": "S", "leadTime": 53.0}, {"date": "2024-10-28", "size": "S", "leadTime": 45.0}, {"date": "2024-11-18", "size": "M", "leadTime": 145.0}, {"date": "2024-12-04", "size": "L", "leadTime": 105.0}, {"date": "2025-01-08", "size": "S", "leadTime": 5.0}, {"date": "2025-01-20", "size": "L", "leadTime": 163.0}, {"date": "2025-02-14", "size": "S", "leadTime": 43.0}, {"date": "2025-02-26", "size": "M", "leadTime": 415.0}, {"date": "2025-03-15", "size": "L", "leadTime": 123.0}, {"date": "2025-04-10", "size": "M", "leadTime": 103.0}, {"date": "2025-05-05", "size": "L", "leadTime": 104.0}, {"date": "2025-06-12", "size": "L", "leadTime": 302.0}, {"date": "2025-06-25", "size": "L", "leadTime": 158.0}, {"date": "2025-07-02", "size": "L", "leadTime": 98.0}, {"date": "2025-07-11", "size": "S", "leadTime": 52.0}, {"date": "2025-07-18", "size": "M", "leadTime": 95.0}, {"date": "2025-07-29", "size": "S", "leadTime": 70.0}, {"date": "2025-08-03", "size": "M", "leadTime": 95.0}, {"date": "2025-08-14", "size": "M", "leadTime": 101.0}, {"date": "2025-08-21", "size": "M", "leadTime": 57.0}, {"date": "2025-08-29", "size": "M", "leadTime": 57.0}, {"date": "2025-09-08", "size": "S", "leadTime": 53.0}, {"date": "2025-09-22", "size": "L", "leadTime": 137.0}, {"date": "2025-10-04", "size": "S", "leadTime": 73.0}, {"date": "2025-10-12", "size": "M", "leadTime": 60.0}, {"date": "2025-10-19", "size": "S", "leadTime": 126.0}, {"date": "2025-10-27", "size": "M", "leadTime": 57.0}, {"date": "2025-11-05", "size": "L", "leadTime": 124.0}, {"date": "2025-11-15", "size": "M", "leadTime": 75.0}, {"date": "2025-11-25", "size": "M", "leadTime": 89.0}, {"date": "2025-12-10", "size": "S", "leadTime": 44.0}];
+
+const STORAGE_KEY = 'leadtime-dashboard-points-v1';
+const COLORS = { S: '#3fb950', M: '#d29922', L: '#f85149', removed: '#484f58' };
+const PERCENTILE_COLORS = { p50: '#58a6ff', p85: '#bc8cff', p95: '#f778ba' };
+
+let points = loadPoints();
+let activeSizes = new Set(['S', 'M', 'L']);
+let chart;
+
+function loadPoints() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) { /* fall through */ }
+  }
+  return DEFAULT_DATA.map((d, i) => ({ id: i + 1, ...d, removed: false }));
+}
+
+function savePoints() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(points));
+}
+
+function nextId() {
+  return points.reduce((m, p) => Math.max(m, p.id), 0) + 1;
+}
+
+function percentile(arr, p) {
+  if (arr.length === 0) return null;
+  const sorted = [...arr].sort((a, b) => a - b);
+  const idx = (p / 100) * (sorted.length - 1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+}
+
+function activePoints() {
+  return points.filter(p => !p.removed && activeSizes.has(p.size));
+}
+
+function renderFilterChips() {
+  const el = document.getElementById('filterChips');
+  el.innerHTML = '';
+  ['S', 'M', 'L'].forEach(size => {
+    const chip = document.createElement('div');
+    chip.className = 'chip' + (activeSizes.has(size) ? ' active' : '');
+    chip.innerHTML = `<span class="dot ${size}"></span> Rozmiar ${size}`;
+    chip.onclick = () => {
+      if (activeSizes.has(size)) activeSizes.delete(size);
+      else activeSizes.add(size);
+      renderFilterChips();
+      renderChart();
+    };
+    el.appendChild(chip);
+  });
+}
+
+function renderRemovedList() {
+  const el = document.getElementById('removedList');
+  const removed = points.filter(p => p.removed);
+  if (removed.length === 0) {
+    el.innerHTML = '<div class="hint">Brak usuniętych punktów.</div>';
+    return;
+  }
+  el.innerHTML = '';
+  removed.forEach(p => {
+    const row = document.createElement('div');
+    row.className = 'removed-item';
+    row.innerHTML = `<span>${p.date} · ${p.size} · ${p.leadTime} dni</span>`;
+    const btn = document.createElement('button');
+    btn.className = 'secondary';
+    btn.textContent = 'Przywróć';
+    btn.onclick = () => {
+      p.removed = false;
+      savePoints();
+      renderAll();
+    };
+    row.appendChild(btn);
+    el.appendChild(row);
+  });
+}
+
+function renderStats() {
+  const active = activePoints();
+  const values = active.map(p => p.leadTime);
+  const p50 = percentile(values, 50);
+  const p85 = percentile(values, 85);
+  const p95 = percentile(values, 95);
+  document.getElementById('p50val').textContent = p50 !== null ? p50.toFixed(0) + ' dni' : '–';
+  document.getElementById('p85val').textContent = p85 !== null ? p85.toFixed(0) + ' dni' : '–';
+  document.getElementById('p95val').textContent = p95 !== null ? p95.toFixed(0) + ' dni' : '–';
+  return { p50, p85, p95 };
+}
+
+function renderChart() {
+  const stats = renderStats();
+  const sortedActive = [...points]
+    .filter(p => !p.removed)
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  const datasets = ['S', 'M', 'L'].map(size => {
+    const pts = points
+      .filter(p => p.size === size && !p.removed)
+      .map(p => ({ x: p.date, y: p.leadTime, id: p.id, _meta: p }));
+    return {
+      label: `Rozmiar ${size}`,
+      data: pts,
+      backgroundColor: activeSizes.has(size) ? COLORS[size] : 'rgba(72,79,88,0.25)',
+      borderColor: activeSizes.has(size) ? COLORS[size] : 'rgba(72,79,88,0.25)',
+      pointRadius: 6,
+      pointHoverRadius: 8,
+      hidden: !activeSizes.has(size),
+    };
+  });
+
+  // removed points shown greyed out, still clickable to restore via list (chart itself just omits them)
+  const minDate = sortedActive.length ? sortedActive[0].date : null;
+  const maxDate = sortedActive.length ? sortedActive[sortedActive.length - 1].date : null;
+
+  function lineDataset(label, value, color) {
+    if (value === null || !minDate || !maxDate) return null;
+    return {
+      label,
+      type: 'line',
+      data: [{ x: minDate, y: value }, { x: maxDate, y: value }],
+      borderColor: color,
+      borderDash: [6, 4],
+      borderWidth: 2,
+      pointRadius: 0,
+      fill: false,
+      order: 0,
+    };
+  }
+
+  [
+    lineDataset('Percentyl 50', stats.p50, PERCENTILE_COLORS.p50),
+    lineDataset('Percentyl 85', stats.p85, PERCENTILE_COLORS.p85),
+    lineDataset('Percentyl 95', stats.p95, PERCENTILE_COLORS.p95),
+  ].forEach(ds => { if (ds) datasets.push(ds); });
+
+  if (chart) chart.destroy();
+  const ctx = document.getElementById('scatterChart').getContext('2d');
+  chart = new Chart(ctx, {
+    type: 'scatter',
+    data: { datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          type: 'time',
+          time: { unit: 'month', tooltipFormat: 'yyyy-MM-dd' },
+          title: { display: true, text: 'Data ukończenia', color: '#8b949e' },
+          ticks: { color: '#8b949e' },
+          grid: { color: '#30363d' },
+        },
+        y: {
+          title: { display: true, text: 'Czas realizacji (dni)', color: '#8b949e' },
+          ticks: { color: '#8b949e' },
+          grid: { color: '#30363d' },
+          beginAtZero: true,
+        },
+      },
+      plugins: {
+        legend: { labels: { color: '#e6edf3' } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const raw = ctx.raw;
+              if (raw && raw.id) {
+                return `${raw._meta.size} · ${raw.y} dni · ${raw.x}`;
+              }
+              return `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(0)} dni`;
+            },
+          },
+        },
+      },
+      onClick: (evt, elements) => {
+        if (!elements.length) return;
+        const el = elements[0];
+        const ds = chart.data.datasets[el.datasetIndex];
+        const point = ds.data[el.index];
+        if (!point || !point.id) return;
+        const target = points.find(p => p.id === point.id);
+        if (target) {
+          target.removed = true;
+          savePoints();
+          renderAll();
+        }
+      },
+    },
+  });
+}
+
+function renderAll() {
+  renderFilterChips();
+  renderRemovedList();
+  renderChart();
+}
+
+document.getElementById('addForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const size = document.getElementById('sizeInput').value;
+  const leadTime = parseFloat(document.getElementById('leadTimeInput').value);
+  const date = document.getElementById('dateInput').value;
+  if (!date || isNaN(leadTime)) return;
+  points.push({ id: nextId(), date, size, leadTime, removed: false });
+  savePoints();
+  renderAll();
+  e.target.reset();
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (!confirm('Przywrócić dane domyślne z pliku źródłowego? Spowoduje to utratę dodanych/zmienionych punktów.')) return;
+  points = DEFAULT_DATA.map((d, i) => ({ id: i + 1, ...d, removed: false }));
+  savePoints();
+  renderAll();
+});
+
+renderAll();
+</script>
+
+</body>
+</html>
