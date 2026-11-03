@@ -148,10 +148,57 @@
   }
   .removed-item button { padding: 4px 10px; font-size: 0.78rem; }
   footer { margin-top: 24px; color: var(--muted); font-size: 0.78rem; text-align: center; }
+  .tabs { display:flex; gap:8px; margin-bottom:20px; border-bottom:1px solid var(--border); }
+  .tab-btn { background:transparent; color:var(--muted); border:none; border-bottom:2px solid transparent; border-radius:0; padding:10px 16px; }
+  .tab-btn.active { color:var(--text); border-bottom-color:var(--accent); }
+  .tab-pane { display:none; }
+  .tab-pane.active { display:block; }
+  .rm-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:16px; margin-bottom:20px; }
+  .rm-grid .panel { margin:0; }
+  .rm-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
+  .rm-row > * { flex:1 1 auto; width:auto; }
+  .rm-row > button { flex:0 0 auto; }
+  .checks { display:flex; flex-wrap:wrap; gap:6px 12px; margin:4px 0 10px; }
+  .checks label { display:inline-flex; align-items:center; gap:5px; color:var(--text); font-size:.85rem; cursor:pointer; }
+  .checks input, .inline-check input { width:auto; }
+  .inline-check { display:flex; align-items:center; gap:6px; color:var(--text); font-size:.85rem; margin-bottom:10px; }
+  .tag-list { display:flex; flex-direction:column; gap:6px; margin-top:10px; max-height:260px; overflow:auto; }
+  .item { display:flex; justify-content:space-between; align-items:center; gap:8px; background:var(--panel-2); border:1px solid var(--border); border-radius:6px; padding:6px 10px; font-size:.82rem; }
+  .item small { color:var(--muted); display:block; }
+  .item button { padding:3px 9px; font-size:.75rem; background:transparent; color:var(--l-color); border:1px solid var(--border); }
+  .gantt-scroll { overflow:auto; border:1px solid var(--border); border-radius:8px; background:var(--panel-2); }
+  .gantt { position:relative; min-width:100%; }
+  .g-head, .g-row { display:flex; height:30px; border-bottom:1px solid var(--border); }
+  .g-head { position:sticky; top:0; z-index:3; background:var(--panel); height:34px; }
+  .g-label { position:sticky; left:0; z-index:2; flex:0 0 240px; background:var(--panel); border-right:1px solid var(--border); padding:6px 10px; font-size:.8rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .g-head .g-label { z-index:4; }
+  .g-init .g-label { background:#21262d; font-weight:600; color:var(--accent); }
+  .g-init { background:#21262d; }
+  .g-track { position:relative; flex:0 0 auto; }
+  .g-month { position:absolute; top:0; bottom:0; border-left:1px solid var(--border); font-size:.7rem; color:var(--muted); padding:9px 4px; overflow:hidden; white-space:nowrap; }
+  .g-line { position:absolute; top:0; bottom:0; border-left:1px solid #30363d55; }
+  .g-bar { position:absolute; top:6px; height:18px; border-radius:4px; font-size:.68rem; line-height:18px; padding:0 6px; overflow:hidden; white-space:nowrap; color:#0d1117; font-weight:600; }
+  .g-plan { position:absolute; top:3px; height:24px; border:1px dashed var(--muted); border-radius:4px; opacity:.6; }
+  .g-bar.fixed { box-shadow:inset 0 0 0 2px #fff; }
+  .g-bar.conflict { background-image:repeating-linear-gradient(45deg,transparent 0 6px,rgba(248,81,73,.8) 6px 9px) !important; color:#fff; }
+  .g-bar.late { outline:2px solid var(--l-color); }
+  .g-today { position:absolute; top:0; bottom:0; border-left:2px solid var(--l-color); z-index:1; }
+  .util { width:100%; border-collapse:collapse; font-size:.75rem; }
+  .util th, .util td { border:1px solid var(--border); padding:4px 6px; text-align:center; white-space:nowrap; }
+  .util th:first-child, .util td:first-child { text-align:left; }
+  .warns .item { border-color:var(--l-color); }
+  .legend { display:flex; gap:16px; flex-wrap:wrap; font-size:.78rem; color:var(--muted); margin:10px 0; }
+  .legend i { display:inline-block; width:16px; height:10px; border-radius:2px; vertical-align:middle; margin-right:4px; }
 </style>
 </head>
 <body>
 
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="tab-lead">📊 Czasy realizacji</button>
+  <button class="tab-btn" data-tab="tab-roadmap">🗺️ Roadmapa i prognoza</button>
+</nav>
+
+<div id="tab-lead" class="tab-pane active">
 <h1>📊 Dashboard czasów realizacji (Lead Time)</h1>
 <div class="subtitle">Scatterplot na podstawie pliku <code>Lead Times - 2024-25.xlsx</code> — filtruj rozmiary, kliknij punkt aby usunąć/przywrócić odstające wartości, dodawaj nowe obserwacje.</div>
 
@@ -208,6 +255,96 @@
 </div>
 
 <footer>Dashboard generowany statycznie — dane przechowywane lokalnie w przeglądarce (localStorage).</footer>
+</div>
+
+<div id="tab-roadmap" class="tab-pane">
+<h1>🗺️ Roadmapa i prognozowanie — wiele zespołów, wiele inicjatyw</h1>
+<div class="subtitle">Zdefiniuj kompetencje, zespoły, capacity oraz projekty. Prognoza układa projekty w czasie tak, by mieściły się w capacity zespołów (daty „fixed” są nieprzekraczalne). Dane zapisywane lokalnie w przeglądarce.</div>
+
+<div class="rm-grid">
+  <div class="panel">
+    <h2>1. Kompetencje</h2>
+    <form class="rm-row" id="rmCompForm"><input id="rmCompName" placeholder="Nazwa kompetencji" required><button type="submit">➕ Dodaj</button></form>
+    <div class="tag-list" id="rmCompList"></div>
+  </div>
+  <div class="panel">
+    <h2>2. Inicjatywy (min. 2)</h2>
+    <form id="rmInitForm">
+      <input id="rmInitName" placeholder="Nazwa inicjatywy" required>
+      <label>Potrzebne kompetencje</label>
+      <div class="checks" id="rmInitComps"></div>
+      <button type="submit">➕ Dodaj inicjatywę</button>
+    </form>
+    <div class="tag-list" id="rmInitList"></div>
+  </div>
+  <div class="panel">
+    <h2>3. Zespoły</h2>
+    <form id="rmTeamForm">
+      <input id="rmTeamName" placeholder="Nazwa zespołu" required>
+      <label>Kompetencje zespołu</label>
+      <div class="checks" id="rmTeamComps"></div>
+      <button type="submit">➕ Dodaj zespół</button>
+    </form>
+    <div class="tag-list" id="rmTeamList"></div>
+  </div>
+  <div class="panel">
+    <h2>4. Capacity zespołu (osobodni / miesiąc)</h2>
+    <form id="rmCapForm">
+      <div class="rm-row"><select id="rmCapTeam"></select><select id="rmCapComp"></select></div>
+      <div class="rm-row">
+        <div><label>Od miesiąca</label><input type="month" id="rmCapFrom" required></div>
+        <div><label>Do miesiąca (opcjonalnie)</label><input type="month" id="rmCapTo"></div>
+        <div><label>Osobodni</label><input type="number" id="rmCapMd" min="0" step="0.5" required></div>
+      </div>
+      <button type="submit">➕ Dodaj / nadpisz capacity</button>
+    </form>
+    <div class="tag-list" id="rmCapList"></div>
+  </div>
+</div>
+
+<div class="panel" style="margin-bottom:20px;">
+  <h2>5. Projekty</h2>
+  <form id="rmProjForm">
+    <div class="rm-row">
+      <input id="rmProjName" placeholder="Nazwa projektu" required>
+      <select id="rmProjInit"></select>
+    </div>
+    <label>Wymagane zespoły</label>
+    <div class="checks" id="rmProjTeams"></div>
+    <label>Wymagane kompetencje</label>
+    <div class="checks" id="rmProjComps"></div>
+    <div class="rm-row">
+      <div><label>Capacity (osobodni / miesiąc, łącznie)</label><input type="number" id="rmProjMd" min="0" step="0.5" required></div>
+      <div><label>Start date</label><input type="date" id="rmProjStart" required></div>
+      <div><label>End date</label><input type="date" id="rmProjEnd" required></div>
+    </div>
+    <label class="inline-check"><input type="checkbox" id="rmProjFixed"> Fixed date — daty nieprzekraczalne (projekt nie zostanie przesunięty)</label>
+    <button type="submit">➕ Dodaj projekt</button>
+  </form>
+  <div class="tag-list" id="rmProjList" style="max-height:none"></div>
+</div>
+
+<div class="panel" style="margin-bottom:20px;">
+  <h2>Gantt — prognozowana roadmapa</h2>
+  <div class="legend">
+    <span><i style="background:#58a6ff"></i>Prognoza (kolor = inicjatywa)</span>
+    <span><i style="border:1px dashed #8b949e"></i>Plan wejściowy (jeśli przesunięty)</span>
+    <span><i style="background:#58a6ff;box-shadow:inset 0 0 0 2px #fff"></i>Fixed</span>
+    <span><i style="background:repeating-linear-gradient(45deg,#58a6ff 0 4px,#f85149 4px 6px)"></i>Przekroczone capacity (fixed)</span>
+    <span><i style="outline:2px solid #f85149"></i>Po End date</span>
+    <span><i style="border-left:2px solid #f85149;height:12px"></i>Dziś</span>
+  </div>
+  <div class="gantt-scroll"><div class="gantt" id="rmGantt"></div></div>
+  <div class="warns tag-list" id="rmWarns"></div>
+</div>
+
+<div class="panel">
+  <h2>Wykorzystanie capacity (zajęte / dostępne, osobodni)</h2>
+  <div style="overflow:auto" id="rmUtil"></div>
+</div>
+
+<div style="margin-top:12px"><button class="secondary" id="rmReset">↺ Przywróć dane przykładowe</button></div>
+</div>
 
 <script>
 const DEFAULT_DATA = [{"date": "2024-07-15", "size": "S", "leadTime": 49.0}, {"date": "2024-08-22", "size": "S", "leadTime": 48.0}, {"date": "2024-09-10", "size": "S", "leadTime": 87.0}, {"date": "2024-09-25", "size": "M", "leadTime": 57.0}, {"date": "2024-10-05", "size": "M", "leadTime": 148.0}, {"date": "2024-10-14", "size": "S", "leadTime": 53.0}, {"date": "2024-10-28", "size": "S", "leadTime": 45.0}, {"date": "2024-11-18", "size": "M", "leadTime": 145.0}, {"date": "2024-12-04", "size": "L", "leadTime": 105.0}, {"date": "2025-01-08", "size": "S", "leadTime": 5.0}, {"date": "2025-01-20", "size": "L", "leadTime": 163.0}, {"date": "2025-02-14", "size": "S", "leadTime": 43.0}, {"date": "2025-02-26", "size": "M", "leadTime": 415.0}, {"date": "2025-03-15", "size": "L", "leadTime": 123.0}, {"date": "2025-04-10", "size": "M", "leadTime": 103.0}, {"date": "2025-05-05", "size": "L", "leadTime": 104.0}, {"date": "2025-06-12", "size": "L", "leadTime": 302.0}, {"date": "2025-06-25", "size": "L", "leadTime": 158.0}, {"date": "2025-07-02", "size": "L", "leadTime": 98.0}, {"date": "2025-07-11", "size": "S", "leadTime": 52.0}, {"date": "2025-07-18", "size": "M", "leadTime": 95.0}, {"date": "2025-07-29", "size": "S", "leadTime": 70.0}, {"date": "2025-08-03", "size": "M", "leadTime": 95.0}, {"date": "2025-08-14", "size": "M", "leadTime": 101.0}, {"date": "2025-08-21", "size": "M", "leadTime": 57.0}, {"date": "2025-08-29", "size": "M", "leadTime": 57.0}, {"date": "2025-09-08", "size": "S", "leadTime": 53.0}, {"date": "2025-09-22", "size": "L", "leadTime": 137.0}, {"date": "2025-10-04", "size": "S", "leadTime": 73.0}, {"date": "2025-10-12", "size": "M", "leadTime": 60.0}, {"date": "2025-10-19", "size": "S", "leadTime": 126.0}, {"date": "2025-10-27", "size": "M", "leadTime": 57.0}, {"date": "2025-11-05", "size": "L", "leadTime": 124.0}, {"date": "2025-11-15", "size": "M", "leadTime": 75.0}, {"date": "2025-11-25", "size": "M", "leadTime": 89.0}, {"date": "2025-12-10", "size": "S", "leadTime": 44.0}];
@@ -432,6 +569,307 @@ document.getElementById('resetBtn').addEventListener('click', () => {
 });
 
 renderAll();
+</script>
+<script>
+document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.tab-btn').forEach(x => x.classList.toggle('active', x === b));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === b.dataset.tab));
+  if (b.dataset.tab === 'tab-lead' && typeof chart !== 'undefined' && chart) chart.resize();
+  if (b.dataset.tab === 'tab-roadmap' && window.rmRender) window.rmRender();
+}));
+(function () {
+  const KEY = 'roadmap-dashboard-v1';
+  const PALETTE = ['#58a6ff', '#3fb950', '#d29922', '#bc8cff', '#f778ba', '#39c5cf', '#ff9f43', '#a5d6ff'];
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const DAY = 86400000;
+  const dn = str => { const [y, m, d] = str.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, d) / DAY); };
+  const ds = n => new Date(n * DAY).toISOString().slice(0, 10);
+  const mkey = n => ds(n).slice(0, 7);
+  const monthStart = key => { const [y, m] = key.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, 1) / DAY); };
+  const nextMonth = key => { let [y, m] = key.split('-').map(Number); m++; if (m > 12) { m = 1; y++; } return y + '-' + String(m).padStart(2, '0'); };
+  const uid = () => Math.random().toString(36).slice(2, 9);
+
+  function defaults() {
+    const now = new Date();
+    let k = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    const months = [];
+    for (let i = 0; i < 18; i++) { months.push(k); k = nextMonth(k); }
+    const c = { fe: 'Frontend', be: 'Backend', qa: 'QA', da: 'Data' };
+    const teams = [
+      { id: 'alfa', name: 'Zespół Alfa', comps: ['fe', 'be', 'qa'] },
+      { id: 'beta', name: 'Zespół Beta', comps: ['be', 'da'] },
+      { id: 'gamma', name: 'Zespół Gamma', comps: ['fe', 'qa'] },
+    ];
+    const capacity = [];
+    const caps = { alfa: { fe: 20, be: 20, qa: 10 }, beta: { be: 20, da: 20 }, gamma: { fe: 20, qa: 20 } };
+    teams.forEach(t => t.comps.forEach(cc => months.forEach(m => capacity.push({ id: uid(), team: t.id, comp: cc, month: m, md: caps[t.id][cc] }))));
+    const first = months[1], third = months[3];
+    const startOf = (mk, add = 0) => ds(monthStart(mk) + add);
+    return {
+      competencies: Object.entries(c).map(([id, name]) => ({ id, name })),
+      initiatives: [
+        { id: 'i1', name: 'Portal klienta', comps: ['fe', 'be', 'qa'] },
+        { id: 'i2', name: 'Platforma danych', comps: ['be', 'da'] },
+      ],
+      teams, capacity,
+      projects: [
+        { id: 'p1', name: 'Portal – MVP', initiative: 'i1', teams: ['alfa', 'gamma'], comps: ['fe', 'be', 'qa'], md: 30, start: startOf(first), end: startOf(months[4], -1), fixed: false },
+        { id: 'p2', name: 'Portal – płatności', initiative: 'i1', teams: ['alfa'], comps: ['be', 'qa'], md: 14, start: startOf(first), end: startOf(months[4], -1), fixed: false },
+        { id: 'p3', name: 'Data lake', initiative: 'i2', teams: ['beta'], comps: ['be', 'da'], md: 30, start: startOf(first), end: startOf(months[5], -1), fixed: false },
+        { id: 'p4', name: 'Raporty zarządcze (fixed)', initiative: 'i2', teams: ['beta'], comps: ['da'], md: 10, start: startOf(third), end: startOf(months[5], -1), fixed: true },
+      ],
+    };
+  }
+
+  let S = load();
+  function load() {
+    try { const r = JSON.parse(localStorage.getItem(KEY)); if (r && r.projects) return r; } catch (e) {}
+    return defaults();
+  }
+  const save = () => localStorage.setItem(KEY, JSON.stringify(S));
+  const compName = id => (S.competencies.find(c => c.id === id) || { name: '?' }).name;
+  const teamName = id => (S.teams.find(t => t.id === id) || { name: '?' }).name;
+
+  // ---------- scheduling ----------
+  function monthParts(s, durDays) {
+    const end = s + durDays, parts = [];
+    let k = mkey(s);
+    while (monthStart(k) < end) {
+      const a = monthStart(k), b = monthStart(nextMonth(k));
+      const ov = Math.min(end, b) - Math.max(s, a);
+      if (ov > 0) parts.push({ key: k, frac: ov / (b - a) });
+      k = nextMonth(k);
+    }
+    return parts;
+  }
+
+  function schedule() {
+    const cap = {}, used = {};
+    S.capacity.forEach(c => { cap[c.team + '|' + c.comp + '|' + c.month] = c.md; });
+    const room = (t, c, m) => Math.max(0, (cap[t + '|' + c + '|' + m] || 0) - (used[t + '|' + c + '|' + m] || 0));
+
+    function attempt(p, s, dur, commit) {
+      const comps = p.comps.length ? p.comps : [];
+      const shortages = [];
+      if (!comps.length || !p.teams.length) return { ok: true, shortages };
+      const parts = monthParts(s, dur);
+      const plan = [];
+      for (const { key, frac } of parts) {
+        for (const c of comps) {
+          const need = p.md / comps.length * frac;
+          const teams = p.teams.filter(t => (S.teams.find(x => x.id === t) || { comps: [] }).comps.includes(c));
+          const rooms = teams.map(t => room(t, c, key));
+          const total = rooms.reduce((a, b) => a + b, 0);
+          if (need > total + 1e-6) shortages.push({ key, comp: c, missing: need - total });
+          if (commit) {
+            const give = Math.min(need, total), over = need - give;
+            teams.forEach((t, i) => {
+              const share = total > 0 ? give * rooms[i] / total : 0;
+              const extra = teams.length ? over / teams.length : 0;
+              used[t + '|' + c + '|' + key] = (used[t + '|' + c + '|' + key] || 0) + share + extra;
+            });
+          }
+        }
+      }
+      return { ok: shortages.length === 0, shortages };
+    }
+
+    const result = {};
+    const fixed = S.projects.filter(p => p.fixed);
+    const flex = S.projects.filter(p => !p.fixed).sort((a, b) => a.start.localeCompare(b.start));
+    fixed.forEach(p => {
+      const s = dn(p.start), dur = dn(p.end) - s + 1;
+      const r = attempt(p, s, dur, true);
+      result[p.id] = { s, e: s + dur - 1, shortages: r.shortages, status: r.ok ? 'ok' : 'conflict' };
+    });
+    flex.forEach(p => {
+      const s0 = dn(p.start), dur = dn(p.end) - s0 + 1;
+      for (let k = 0; k <= 260; k++) {
+        const s = s0 + 7 * k;
+        if (attempt(p, s, dur, false).ok) {
+          attempt(p, s, dur, true);
+          result[p.id] = { s, e: s + dur - 1, shortages: [], status: k ? 'moved' : 'ok' };
+          return;
+        }
+      }
+      result[p.id] = { s: s0, e: s0 + dur - 1, shortages: attempt(p, s0, dur, false).shortages, status: 'unplaced' };
+    });
+    return { result, used, cap };
+  }
+
+  // ---------- forms / lists ----------
+  function checks(id, items, selected, name) {
+    const el = $(id);
+    el.innerHTML = items.length ? items.map(i => `<label><input type="checkbox" data-k="${esc(i.id)}" ${selected.includes(i.id) ? 'checked' : ''}> ${esc(i.name)}</label>`).join('') : '<span class="hint">Brak pozycji.</span>';
+  }
+  const picked = id => [...$(id).querySelectorAll('input:checked')].map(i => i.dataset.k);
+  function options(id, items, cur) {
+    $(id).innerHTML = items.map(i => `<option value="${esc(i.id)}">${esc(i.name)}</option>`).join('');
+    if (cur && items.some(i => i.id === cur)) $(id).value = cur;
+  }
+  function listHtml(id, rows) {
+    $(id).innerHTML = rows.length ? rows.map(r => `<div class="item"><div>${r.html}</div><button data-del="${esc(r.id)}">Usuń</button></div>`).join('') : '<div class="hint">Brak pozycji.</div>';
+  }
+
+  function renderForms() {
+    const prev = { ic: picked('rmInitComps'), tc: picked('rmTeamComps'), pt: picked('rmProjTeams'), pc: picked('rmProjComps') };
+    const curInit = $('rmProjInit').value, curTeam = $('rmCapTeam').value, curComp = $('rmCapComp').value;
+    checks('rmInitComps', S.competencies, prev.ic);
+    checks('rmTeamComps', S.competencies, prev.tc);
+    checks('rmProjTeams', S.teams, prev.pt);
+    checks('rmProjComps', S.competencies, prev.pc);
+    options('rmProjInit', S.initiatives, curInit);
+    options('rmCapTeam', S.teams, curTeam);
+    renderCapComps(curComp);
+
+    listHtml('rmCompList', S.competencies.map(c => ({ id: c.id, html: esc(c.name) })));
+    listHtml('rmInitList', S.initiatives.map(i => ({ id: i.id, html: `<b>${esc(i.name)}</b><small>${i.comps.map(compName).map(esc).join(', ') || '—'}</small>` })));
+    listHtml('rmTeamList', S.teams.map(t => ({ id: t.id, html: `<b>${esc(t.name)}</b><small>${t.comps.map(compName).map(esc).join(', ') || '—'}</small>` })));
+    const caps = [...S.capacity].sort((a, b) => a.month.localeCompare(b.month) || teamName(a.team).localeCompare(teamName(b.team)));
+    listHtml('rmCapList', caps.map(c => ({ id: c.id, html: `${esc(teamName(c.team))} · ${esc(compName(c.comp))} · ${c.month}: <b>${c.md} md</b>` })));
+    listHtml('rmProjList', S.projects.map(p => {
+      const ini = S.initiatives.find(i => i.id === p.initiative);
+      return { id: p.id, html: `<b>${esc(p.name)}</b>${p.fixed ? ' 🔒' : ''} <small>${esc(ini ? ini.name : '—')} · ${p.start} → ${p.end} · ${p.md} md/mc · zespoły: ${p.teams.map(teamName).map(esc).join(', ') || '—'} · kompetencje: ${p.comps.map(compName).map(esc).join(', ') || '—'}</small>` };
+    }));
+  }
+
+  function renderCapComps(cur) {
+    const t = S.teams.find(x => x.id === $('rmCapTeam').value);
+    options('rmCapComp', t ? S.competencies.filter(c => t.comps.includes(c.id)) : [], cur);
+  }
+
+  // ---------- rendering ----------
+  function renderGantt(sch) {
+    const el = $('rmGantt');
+    const items = S.projects.map(p => ({ p, r: sch.result[p.id] })).filter(x => x.r);
+    if (!items.length) { el.innerHTML = '<div class="hint" style="padding:14px">Dodaj projekty, aby zobaczyć Gantt.</div>'; return; }
+    const today = Math.round(Date.now() / DAY);
+    let lo = Math.min(...items.map(x => Math.min(x.r.s, dn(x.p.start)))), hi = Math.max(...items.map(x => Math.max(x.r.e, dn(x.p.end))));
+    lo = monthStart(mkey(lo)); hi = monthStart(nextMonth(mkey(hi)));
+    const px = 3, W = (hi - lo) * px;
+    const x = d => (d - lo) * px;
+    let months = '', lines = '', k = mkey(lo);
+    while (monthStart(k) < hi) {
+      const a = monthStart(k);
+      months += `<div class="g-month" style="left:${x(a)}px;width:${(monthStart(nextMonth(k)) - a) * px}px">${k}</div>`;
+      lines += `<div class="g-line" style="left:${x(a)}px"></div>`;
+      k = nextMonth(k);
+    }
+    let html = `<div class="g-head"><div class="g-label">Inicjatywa / projekt</div><div class="g-track" style="width:${W}px">${months}</div></div>`;
+    S.initiatives.forEach((ini, idx) => {
+      const rows = items.filter(i => i.p.initiative === ini.id);
+      if (!rows.length) return;
+      const color = PALETTE[idx % PALETTE.length];
+      html += `<div class="g-row g-init"><div class="g-label" style="color:${color}">${esc(ini.name)}</div><div class="g-track" style="width:${W}px">${lines}</div></div>`;
+      rows.forEach(({ p, r }) => {
+        const cls = ['g-bar', p.fixed ? 'fixed' : '', r.status === 'conflict' || r.status === 'unplaced' ? 'conflict' : '', r.e > dn(p.end) ? 'late' : ''].join(' ');
+        const plan = r.s !== dn(p.start) ? `<div class="g-plan" style="left:${x(dn(p.start))}px;width:${(dn(p.end) - dn(p.start) + 1) * px}px"></div>` : '';
+        const tip = `${p.name}\nPrognoza: ${ds(r.s)} → ${ds(r.e)}\nPlan: ${p.start} → ${p.end}${p.fixed ? '\nFIXED' : ''}`;
+        html += `<div class="g-row"><div class="g-label" title="${esc(p.name)}">${p.fixed ? '🔒 ' : ''}${esc(p.name)}</div><div class="g-track" style="width:${W}px">${lines}${plan}<div class="${cls}" title="${esc(tip)}" style="left:${x(r.s)}px;width:${(r.e - r.s + 1) * px}px;background:${color}">${ds(r.s)} → ${ds(r.e)}</div></div></div>`;
+      });
+    });
+    if (today >= lo && today <= hi) html += `<div class="g-today" style="left:${240 + x(today)}px"></div>`;
+    el.style.width = (240 + W) + 'px';
+    el.innerHTML = html;
+  }
+
+  function renderWarns(sch) {
+    const w = [];
+    if (S.initiatives.length < 2) w.push('Dodaj co najmniej dwie inicjatywy.');
+    S.projects.forEach(p => {
+      const r = sch.result[p.id];
+      if (!r) return;
+      const miss = r.shortages.slice(0, 3).map(s => `${s.key} ${compName(s.comp)} (−${s.missing.toFixed(1)} md)`).join(', ');
+      if (r.status === 'conflict') w.push(`🔒 „${p.name}” (fixed): brak capacity — ${miss}${r.shortages.length > 3 ? '…' : ''}`);
+      if (r.status === 'unplaced') w.push(`„${p.name}”: nie znaleziono terminu w ciągu 5 lat — ${miss}`);
+      if (r.status === 'moved') w.push(`„${p.name}”: przesunięty z ${p.start} na ${ds(r.s)}${r.e > dn(p.end) ? ' — po planowanym End date' : ''}`);
+    });
+    $('rmWarns').innerHTML = w.map(t => `<div class="item"><div>${esc(t)}</div></div>`).join('');
+  }
+
+  function renderUtil(sch) {
+    const rs = Object.values(sch.result);
+    if (!rs.length) { $('rmUtil').innerHTML = '<div class="hint">Brak danych.</div>'; return; }
+    let k = mkey(Math.min(...rs.map(r => r.s))); const last = mkey(Math.max(...rs.map(r => r.e)));
+    const months = [];
+    while (k <= last && months.length < 36) { months.push(k); k = nextMonth(k); }
+    let h = `<table class="util"><tr><th>Kompetencja</th>${months.map(m => `<th>${m}</th>`).join('')}</tr>`;
+    S.competencies.forEach(c => {
+      h += `<tr><td>${esc(c.name)}</td>`;
+      months.forEach(m => {
+        let u = 0, cp = 0;
+        S.teams.forEach(t => { u += sch.used[t.id + '|' + c.id + '|' + m] || 0; cp += sch.cap[t.id + '|' + c.id + '|' + m] || 0; });
+        const pct = cp ? u / cp : (u > 0 ? 2 : 0);
+        const bg = pct > 1 ? 'rgba(248,81,73,.45)' : pct > .8 ? 'rgba(210,153,34,.4)' : pct > 0 ? 'rgba(63,185,80,.3)' : 'transparent';
+        h += `<td style="background:${bg}">${u.toFixed(1)} / ${cp.toFixed(1)}</td>`;
+      });
+      h += '</tr>';
+    });
+    $('rmUtil').innerHTML = h + '</table>';
+  }
+
+  function render() {
+    renderForms();
+    const sch = schedule();
+    renderGantt(sch); renderWarns(sch); renderUtil(sch);
+  }
+  window.rmRender = render;
+
+  // ---------- events ----------
+  function clean() {
+    const ids = (arr) => new Set(arr.map(x => x.id));
+    const cs = ids(S.competencies), ts = ids(S.teams), is = ids(S.initiatives);
+    S.initiatives.forEach(i => i.comps = i.comps.filter(c => cs.has(c)));
+    S.teams.forEach(t => t.comps = t.comps.filter(c => cs.has(c)));
+    S.capacity = S.capacity.filter(c => cs.has(c.comp) && ts.has(c.team));
+    S.projects.forEach(p => { p.teams = p.teams.filter(t => ts.has(t)); p.comps = p.comps.filter(c => cs.has(c)); if (!is.has(p.initiative)) p.initiative = (S.initiatives[0] || {}).id; });
+  }
+
+  $('rmCompForm').onsubmit = e => { e.preventDefault(); const n = $('rmCompName').value.trim(); if (!n) return; S.competencies.push({ id: uid(), name: n }); $('rmCompName').value = ''; save(); render(); };
+  $('rmInitForm').onsubmit = e => { e.preventDefault(); S.initiatives.push({ id: uid(), name: $('rmInitName').value.trim(), comps: picked('rmInitComps') }); $('rmInitName').value = ''; $('rmInitComps').querySelectorAll('input').forEach(i => i.checked = false); save(); render(); };
+  $('rmTeamForm').onsubmit = e => { e.preventDefault(); S.teams.push({ id: uid(), name: $('rmTeamName').value.trim(), comps: picked('rmTeamComps') }); $('rmTeamName').value = ''; $('rmTeamComps').querySelectorAll('input').forEach(i => i.checked = false); save(); render(); };
+  $('rmCapTeam').onchange = () => renderCapComps();
+  $('rmCapForm').onsubmit = e => {
+    e.preventDefault();
+    const team = $('rmCapTeam').value, comp = $('rmCapComp').value, md = parseFloat($('rmCapMd').value);
+    const from = $('rmCapFrom').value, to = $('rmCapTo').value || from;
+    if (!team || !comp || !from || isNaN(md) || to < from) { alert('Uzupełnij zespół, kompetencję, zakres miesięcy i wartość (zespół musi mieć przypisaną kompetencję).'); return; }
+    for (let m = from; m <= to; m = nextMonth(m)) {
+      const ex = S.capacity.find(c => c.team === team && c.comp === comp && c.month === m);
+      if (ex) ex.md = md; else S.capacity.push({ id: uid(), team, comp, month: m, md });
+    }
+    save(); render();
+  };
+  $('rmProjInit').onchange = () => {
+    const i = S.initiatives.find(x => x.id === $('rmProjInit').value);
+    $('rmProjComps').querySelectorAll('input').forEach(c => c.checked = !!i && i.comps.includes(c.dataset.k));
+  };
+  $('rmProjForm').onsubmit = e => {
+    e.preventDefault();
+    const start = $('rmProjStart').value, end = $('rmProjEnd').value;
+    if (end < start) { alert('End date nie może być przed Start date.'); return; }
+    if (!S.initiatives.length) { alert('Najpierw dodaj inicjatywę.'); return; }
+    S.projects.push({ id: uid(), name: $('rmProjName').value.trim(), initiative: $('rmProjInit').value, teams: picked('rmProjTeams'), comps: picked('rmProjComps'), md: parseFloat($('rmProjMd').value), start, end, fixed: $('rmProjFixed').checked });
+    e.target.reset(); save(); render();
+  };
+  document.querySelector('#tab-roadmap').addEventListener('click', e => {
+    const id = e.target.dataset && e.target.dataset.del;
+    if (!id) return;
+    const list = e.target.closest('.tag-list').id;
+    if (list === 'rmCompList') S.competencies = S.competencies.filter(x => x.id !== id);
+    else if (list === 'rmInitList') S.initiatives = S.initiatives.filter(x => x.id !== id);
+    else if (list === 'rmTeamList') S.teams = S.teams.filter(x => x.id !== id);
+    else if (list === 'rmCapList') S.capacity = S.capacity.filter(x => x.id !== id);
+    else if (list === 'rmProjList') S.projects = S.projects.filter(x => x.id !== id);
+    else return;
+    if (list !== 'rmCapList' && list !== 'rmProjList') clean();
+    save(); render();
+  });
+  $('rmReset').onclick = () => { if (confirm('Przywrócić dane przykładowe? Utracisz wprowadzone dane.')) { S = defaults(); save(); render(); } };
+
+  render();
+})();
 </script>
 
 </body>
