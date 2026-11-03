@@ -183,6 +183,11 @@
   .g-bar.conflict { background-image:repeating-linear-gradient(45deg,transparent 0 6px,rgba(248,81,73,.8) 6px 9px) !important; color:#fff; }
   .g-bar.late { outline:2px solid var(--l-color); }
   .g-today { position:absolute; top:0; bottom:0; border-left:2px solid var(--l-color); z-index:1; }
+  .cap-table { border-collapse:collapse; font-size:.8rem; }
+  .cap-table th, .cap-table td { border:1px solid var(--border); padding:4px 6px; text-align:center; white-space:nowrap; }
+  .cap-table th:first-child { text-align:left; min-width:160px; position:sticky; left:0; background:var(--panel); }
+  .cap-table input[type=number] { width:70px; padding:4px 6px; text-align:center; }
+  .cap-table .x { padding:1px 7px; font-size:.7rem; background:transparent; color:var(--l-color); border:1px solid var(--border); margin-left:6px; }
   .util { width:100%; border-collapse:collapse; font-size:.75rem; }
   .util th, .util td { border:1px solid var(--border); padding:4px 6px; text-align:center; white-space:nowrap; }
   .util th:first-child, .util td:first-child { text-align:left; }
@@ -287,19 +292,19 @@
     </form>
     <div class="tag-list" id="rmTeamList"></div>
   </div>
-  <div class="panel">
-    <h2>4. Capacity zespołu (osobodni / miesiąc)</h2>
-    <form id="rmCapForm">
-      <div class="rm-row"><select id="rmCapTeam"></select><select id="rmCapComp"></select></div>
-      <div class="rm-row">
-        <div><label>Od miesiąca</label><input type="month" id="rmCapFrom" required></div>
-        <div><label>Do miesiąca (opcjonalnie)</label><input type="month" id="rmCapTo"></div>
-        <div><label>Osobodni</label><input type="number" id="rmCapMd" min="0" step="0.5" required></div>
-      </div>
-      <button type="submit">➕ Dodaj / nadpisz capacity</button>
-    </form>
-    <div class="tag-list" id="rmCapList"></div>
+</div>
+
+<div class="panel" style="margin-bottom:20px;">
+  <h2>4. Capacity zespołów (osobodni MD / miesiąc)</h2>
+  <div class="rm-row">
+    <select id="rmCapTeam" style="max-width:260px"></select>
+    <button id="rmCapAddTeam" type="button">➕ Dodaj zespół do tabeli</button>
+    <input type="month" id="rmCapMonth" style="max-width:180px">
+    <button id="rmCapAddMonth" type="button">➕ Dodaj miesiąc</button>
+    <button id="rmCapNextMonth" type="button" class="secondary">➕ Następny miesiąc</button>
   </div>
+  <div style="overflow:auto"><div id="rmCapTable"></div></div>
+  <div class="hint">Wpisz liczbę MD w komórce (pusta = 0). Capacity zespołu jest wspólną pulą dzielącą się między jego kompetencje.</div>
 </div>
 
 <div class="panel" style="margin-bottom:20px;">
@@ -578,7 +583,7 @@ document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', (
   if (b.dataset.tab === 'tab-roadmap' && window.rmRender) window.rmRender();
 }));
 (function () {
-  const KEY = 'roadmap-dashboard-v1';
+  const KEY = 'roadmap-dashboard-v2';
   const PALETTE = ['#58a6ff', '#3fb950', '#d29922', '#bc8cff', '#f778ba', '#39c5cf', '#ff9f43', '#a5d6ff'];
   const $ = id => document.getElementById(id);
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -601,9 +606,9 @@ document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', (
       { id: 'beta', name: 'Zespół Beta', comps: ['be', 'da'] },
       { id: 'gamma', name: 'Zespół Gamma', comps: ['fe', 'qa'] },
     ];
-    const capacity = [];
-    const caps = { alfa: { fe: 20, be: 20, qa: 10 }, beta: { be: 20, da: 20 }, gamma: { fe: 20, qa: 20 } };
-    teams.forEach(t => t.comps.forEach(cc => months.forEach(m => capacity.push({ id: uid(), team: t.id, comp: cc, month: m, md: caps[t.id][cc] }))));
+    const cap = {};
+    const caps = { alfa: 50, beta: 40, gamma: 40 };
+    teams.forEach(t => months.forEach(m => { cap[t.id + '|' + m] = caps[t.id]; }));
     const first = months[1], third = months[3];
     const startOf = (mk, add = 0) => ds(monthStart(mk) + add);
     return {
@@ -612,7 +617,7 @@ document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', (
         { id: 'i1', name: 'Portal klienta', comps: ['fe', 'be', 'qa'] },
         { id: 'i2', name: 'Platforma danych', comps: ['be', 'da'] },
       ],
-      teams, capacity,
+      teams, capTeams: teams.map(t => t.id), capMonths: months, cap,
       projects: [
         { id: 'p1', name: 'Portal – MVP', initiative: 'i1', teams: ['alfa', 'gamma'], comps: ['fe', 'be', 'qa'], md: 30, start: startOf(first), end: startOf(months[4], -1), fixed: false },
         { id: 'p2', name: 'Portal – płatności', initiative: 'i1', teams: ['alfa'], comps: ['be', 'qa'], md: 14, start: startOf(first), end: startOf(months[4], -1), fixed: false },
@@ -645,33 +650,31 @@ document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', (
   }
 
   function schedule() {
-    const cap = {}, used = {};
-    S.capacity.forEach(c => { cap[c.team + '|' + c.comp + '|' + c.month] = c.md; });
-    const room = (t, c, m) => Math.max(0, (cap[t + '|' + c + '|' + m] || 0) - (used[t + '|' + c + '|' + m] || 0));
+    const cap = { ...S.cap }, used = {};
+    const room = (t, m, d) => Math.max(0, (cap[t + '|' + m] || 0) - (used[t + '|' + m] || 0) - (d[t + '|' + m] || 0));
 
     function attempt(p, s, dur, commit) {
       const comps = p.comps.length ? p.comps : [];
       const shortages = [];
       if (!comps.length || !p.teams.length) return { ok: true, shortages };
       const parts = monthParts(s, dur);
-      const plan = [];
+      const delta = {};
       for (const { key, frac } of parts) {
         for (const c of comps) {
           const need = p.md / comps.length * frac;
           const teams = p.teams.filter(t => (S.teams.find(x => x.id === t) || { comps: [] }).comps.includes(c));
-          const rooms = teams.map(t => room(t, c, key));
+          const rooms = teams.map(t => room(t, key, delta));
           const total = rooms.reduce((a, b) => a + b, 0);
           if (need > total + 1e-6) shortages.push({ key, comp: c, missing: need - total });
-          if (commit) {
-            const give = Math.min(need, total), over = need - give;
-            teams.forEach((t, i) => {
-              const share = total > 0 ? give * rooms[i] / total : 0;
-              const extra = teams.length ? over / teams.length : 0;
-              used[t + '|' + c + '|' + key] = (used[t + '|' + c + '|' + key] || 0) + share + extra;
-            });
-          }
+          const give = Math.min(need, total), over = need - give;
+          teams.forEach((t, i) => {
+            const share = total > 0 ? give * rooms[i] / total : 0;
+            const extra = teams.length ? over / teams.length : 0;
+            delta[t + '|' + key] = (delta[t + '|' + key] || 0) + share + extra;
+          });
         }
       }
+      if (commit) Object.entries(delta).forEach(([k, v]) => { used[k] = (used[k] || 0) + v; });
       return { ok: shortages.length === 0, shortages };
     }
 
@@ -714,29 +717,34 @@ document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', (
 
   function renderForms() {
     const prev = { ic: picked('rmInitComps'), tc: picked('rmTeamComps'), pt: picked('rmProjTeams'), pc: picked('rmProjComps') };
-    const curInit = $('rmProjInit').value, curTeam = $('rmCapTeam').value, curComp = $('rmCapComp').value;
+    const curInit = $('rmProjInit').value, curTeam = $('rmCapTeam').value;
     checks('rmInitComps', S.competencies, prev.ic);
     checks('rmTeamComps', S.competencies, prev.tc);
     checks('rmProjTeams', S.teams, prev.pt);
     checks('rmProjComps', S.competencies, prev.pc);
     options('rmProjInit', S.initiatives, curInit);
-    options('rmCapTeam', S.teams, curTeam);
-    renderCapComps(curComp);
+    options('rmCapTeam', S.teams.filter(t => !S.capTeams.includes(t.id)), curTeam);
+    renderCapTable();
 
     listHtml('rmCompList', S.competencies.map(c => ({ id: c.id, html: esc(c.name) })));
     listHtml('rmInitList', S.initiatives.map(i => ({ id: i.id, html: `<b>${esc(i.name)}</b><small>${i.comps.map(compName).map(esc).join(', ') || '—'}</small>` })));
     listHtml('rmTeamList', S.teams.map(t => ({ id: t.id, html: `<b>${esc(t.name)}</b><small>${t.comps.map(compName).map(esc).join(', ') || '—'}</small>` })));
-    const caps = [...S.capacity].sort((a, b) => a.month.localeCompare(b.month) || teamName(a.team).localeCompare(teamName(b.team)));
-    listHtml('rmCapList', caps.map(c => ({ id: c.id, html: `${esc(teamName(c.team))} · ${esc(compName(c.comp))} · ${c.month}: <b>${c.md} md</b>` })));
     listHtml('rmProjList', S.projects.map(p => {
       const ini = S.initiatives.find(i => i.id === p.initiative);
       return { id: p.id, html: `<b>${esc(p.name)}</b>${p.fixed ? ' 🔒' : ''} <small>${esc(ini ? ini.name : '—')} · ${p.start} → ${p.end} · ${p.md} md/mc · zespoły: ${p.teams.map(teamName).map(esc).join(', ') || '—'} · kompetencje: ${p.comps.map(compName).map(esc).join(', ') || '—'}</small>` };
     }));
   }
 
-  function renderCapComps(cur) {
-    const t = S.teams.find(x => x.id === $('rmCapTeam').value);
-    options('rmCapComp', t ? S.competencies.filter(c => t.comps.includes(c.id)) : [], cur);
+  function renderCapTable() {
+    const teams = S.capTeams.map(id => S.teams.find(t => t.id === id)).filter(Boolean);
+    if (!S.capMonths.length || !teams.length) { $('rmCapTable').innerHTML = '<div class="hint">Dodaj zespół i miesiąc, aby wypełnić tabelę capacity.</div>'; return; }
+    let h = '<table class="cap-table"><tr><th>Zespół</th>' + S.capMonths.map(m => `<th>${m}<button class="x" data-delmonth="${m}" title="Usuń miesiąc">✕</button></th>`).join('') + '</tr>';
+    teams.forEach(t => {
+      h += `<tr><th>${esc(t.name)}<button class="x" data-delteam="${esc(t.id)}" title="Usuń zespół z tabeli">✕</button></th>`;
+      S.capMonths.forEach(m => { const v = S.cap[t.id + '|' + m]; h += `<td><input type="number" min="0" step="0.5" data-cap="${esc(t.id)}|${m}" value="${v === undefined ? '' : v}"></td>`; });
+      h += '</tr>';
+    });
+    $('rmCapTable').innerHTML = h + '</table>';
   }
 
   // ---------- rendering ----------
@@ -792,21 +800,28 @@ document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', (
     const rs = Object.values(sch.result);
     if (!rs.length) { $('rmUtil').innerHTML = '<div class="hint">Brak danych.</div>'; return; }
     let k = mkey(Math.min(...rs.map(r => r.s))); const last = mkey(Math.max(...rs.map(r => r.e)));
+    k = S.capMonths.length ? S.capMonths[0] < k ? S.capMonths[0] : k : k;
     const months = [];
-    while (k <= last && months.length < 36) { months.push(k); k = nextMonth(k); }
-    let h = `<table class="util"><tr><th>Kompetencja</th>${months.map(m => `<th>${m}</th>`).join('')}</tr>`;
-    S.competencies.forEach(c => {
-      h += `<tr><td>${esc(c.name)}</td>`;
+    let kk = k;
+    const lastAll = S.capMonths.length && S.capMonths[S.capMonths.length - 1] > last ? S.capMonths[S.capMonths.length - 1] : last;
+    while (kk <= lastAll && months.length < 48) { months.push(kk); kk = nextMonth(kk); }
+    let h = `<table class="util"><tr><th>Zespół</th>${months.map(m => `<th>${m}</th>`).join('')}</tr>`;
+    S.teams.filter(t => S.capTeams.includes(t.id)).forEach(t => {
+      h += `<tr><td>${esc(t.name)}</td>`;
       months.forEach(m => {
-        let u = 0, cp = 0;
-        S.teams.forEach(t => { u += sch.used[t.id + '|' + c.id + '|' + m] || 0; cp += sch.cap[t.id + '|' + c.id + '|' + m] || 0; });
-        const pct = cp ? u / cp : (u > 0 ? 2 : 0);
-        const bg = pct > 1 ? 'rgba(248,81,73,.45)' : pct > .8 ? 'rgba(210,153,34,.4)' : pct > 0 ? 'rgba(63,185,80,.3)' : 'transparent';
+        const u = sch.used[t.id + '|' + m] || 0, cp = sch.cap[t.id + '|' + m] || 0;
+        const pct = cp ? u / cp : (u > 0.05 ? 2 : 0);
+        const bg = pct > 1.0001 ? 'rgba(248,81,73,.45)' : pct > .8 ? 'rgba(210,153,34,.4)' : pct > 0 ? 'rgba(63,185,80,.3)' : 'transparent';
         h += `<td style="background:${bg}">${u.toFixed(1)} / ${cp.toFixed(1)}</td>`;
       });
       h += '</tr>';
     });
     $('rmUtil').innerHTML = h + '</table>';
+  }
+
+  function renderGanttOnly() {
+    const sch = schedule();
+    renderGantt(sch); renderWarns(sch); renderUtil(sch);
   }
 
   function render() {
@@ -822,25 +837,38 @@ document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', (
     const cs = ids(S.competencies), ts = ids(S.teams), is = ids(S.initiatives);
     S.initiatives.forEach(i => i.comps = i.comps.filter(c => cs.has(c)));
     S.teams.forEach(t => t.comps = t.comps.filter(c => cs.has(c)));
-    S.capacity = S.capacity.filter(c => cs.has(c.comp) && ts.has(c.team));
+    S.capTeams = S.capTeams.filter(t => ts.has(t));
     S.projects.forEach(p => { p.teams = p.teams.filter(t => ts.has(t)); p.comps = p.comps.filter(c => cs.has(c)); if (!is.has(p.initiative)) p.initiative = (S.initiatives[0] || {}).id; });
   }
 
   $('rmCompForm').onsubmit = e => { e.preventDefault(); const n = $('rmCompName').value.trim(); if (!n) return; S.competencies.push({ id: uid(), name: n }); $('rmCompName').value = ''; save(); render(); };
   $('rmInitForm').onsubmit = e => { e.preventDefault(); S.initiatives.push({ id: uid(), name: $('rmInitName').value.trim(), comps: picked('rmInitComps') }); $('rmInitName').value = ''; $('rmInitComps').querySelectorAll('input').forEach(i => i.checked = false); save(); render(); };
   $('rmTeamForm').onsubmit = e => { e.preventDefault(); S.teams.push({ id: uid(), name: $('rmTeamName').value.trim(), comps: picked('rmTeamComps') }); $('rmTeamName').value = ''; $('rmTeamComps').querySelectorAll('input').forEach(i => i.checked = false); save(); render(); };
-  $('rmCapTeam').onchange = () => renderCapComps();
-  $('rmCapForm').onsubmit = e => {
-    e.preventDefault();
-    const team = $('rmCapTeam').value, comp = $('rmCapComp').value, md = parseFloat($('rmCapMd').value);
-    const from = $('rmCapFrom').value, to = $('rmCapTo').value || from;
-    if (!team || !comp || !from || isNaN(md) || to < from) { alert('Uzupełnij zespół, kompetencję, zakres miesięcy i wartość (zespół musi mieć przypisaną kompetencję).'); return; }
-    for (let m = from; m <= to; m = nextMonth(m)) {
-      const ex = S.capacity.find(c => c.team === team && c.comp === comp && c.month === m);
-      if (ex) ex.md = md; else S.capacity.push({ id: uid(), team, comp, month: m, md });
-    }
-    save(); render();
+  const addMonth = m => {
+    if (!m) return;
+    if (!S.capMonths.includes(m)) S.capMonths.push(m);
+    S.capMonths.sort(); save(); render();
   };
+  $('rmCapAddTeam').onclick = () => { const t = $('rmCapTeam').value; if (!t) return; S.capTeams.push(t); save(); render(); };
+  $('rmCapAddMonth').onclick = () => { addMonth($('rmCapMonth').value); $('rmCapMonth').value = ''; };
+  $('rmCapNextMonth').onclick = () => {
+    const last = S.capMonths[S.capMonths.length - 1];
+    const d = new Date(); addMonth(last ? nextMonth(last) : d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'));
+  };
+  $('rmCapTable').addEventListener('change', e => {
+    const k = e.target.dataset.cap;
+    if (!k) return;
+    const v = parseFloat(e.target.value);
+    if (isNaN(v) || v < 0) delete S.cap[k]; else S.cap[k] = v;
+    save(); renderGanttOnly();
+  });
+  $('rmCapTable').addEventListener('click', e => {
+    const m = e.target.dataset.delmonth, t = e.target.dataset.delteam;
+    if (m) { S.capMonths = S.capMonths.filter(x => x !== m); Object.keys(S.cap).forEach(k => { if (k.endsWith('|' + m)) delete S.cap[k]; }); }
+    else if (t) { S.capTeams = S.capTeams.filter(x => x !== t); Object.keys(S.cap).forEach(k => { if (k.startsWith(t + '|')) delete S.cap[k]; }); }
+    else return;
+    save(); render();
+  });
   $('rmProjInit').onchange = () => {
     const i = S.initiatives.find(x => x.id === $('rmProjInit').value);
     $('rmProjComps').querySelectorAll('input').forEach(c => c.checked = !!i && i.comps.includes(c.dataset.k));
@@ -860,10 +888,9 @@ document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', (
     if (list === 'rmCompList') S.competencies = S.competencies.filter(x => x.id !== id);
     else if (list === 'rmInitList') S.initiatives = S.initiatives.filter(x => x.id !== id);
     else if (list === 'rmTeamList') S.teams = S.teams.filter(x => x.id !== id);
-    else if (list === 'rmCapList') S.capacity = S.capacity.filter(x => x.id !== id);
     else if (list === 'rmProjList') S.projects = S.projects.filter(x => x.id !== id);
     else return;
-    if (list !== 'rmCapList' && list !== 'rmProjList') clean();
+    if (list !== 'rmProjList') clean();
     save(); render();
   });
   $('rmReset').onclick = () => { if (confirm('Przywrócić dane przykładowe? Utracisz wprowadzone dane.')) { S = defaults(); save(); render(); } };
